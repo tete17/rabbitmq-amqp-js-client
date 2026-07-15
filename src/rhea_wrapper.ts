@@ -29,6 +29,9 @@ export async function openRheaConnection(
     container.once(ConnectionEvents.connectionError, (context) => {
       return rej(context.error ?? new Error("Connection error occurred"))
     })
+    container.on(ConnectionEvents.disconnected, (context) => {
+      if (!context.reconnecting) return rej(context.error ?? new Error("Connection disconnected"))
+    })
 
     container.connect(buildConnectParams(envParams, connParams, getOauthPassword))
   })
@@ -61,6 +64,7 @@ export function buildConnectParams(
 ): ConnectionOptions {
   const reconnectParams = buildReconnectParams(connParams)
   const tlsParams = buildTlsParams(envParams)
+  const virtualHostParams = buildVirtualHostParams(envParams)
   if (envParams.webSocket) {
     const ws = websocket_connect(envParams.webSocket.implementation)
     const wsUrl = envParams.webSocket.url ?? `ws://${envParams.host}:${envParams.port}/ws`
@@ -80,6 +84,7 @@ export function buildConnectParams(
       ...envParams,
       ...reconnectParams,
       ...tlsParams,
+      ...virtualHostParams,
     }
   }
 
@@ -101,6 +106,7 @@ export function buildConnectParams(
       password: envParams.oauth.token,
       ...reconnectParams,
       ...tlsParams,
+      ...virtualHostParams,
     }
   }
 
@@ -108,6 +114,7 @@ export function buildConnectParams(
     ...envParams,
     ...reconnectParams,
     ...tlsParams,
+    ...virtualHostParams,
   }
 }
 
@@ -132,6 +139,14 @@ function buildTlsParams(envParams?: EnvironmentParams) {
       transport: "tls",
       ...envParams.tls,
     }
+  }
+
+  return {}
+}
+
+function buildVirtualHostParams(envParams: EnvironmentParams) {
+  if (envParams.virtualHost) {
+    return { hostname: `vhost:${envParams.virtualHost}` }
   }
 
   return {}
